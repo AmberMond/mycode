@@ -153,14 +153,11 @@ void Solver::computeLimiters(const std::vector<State>& U_in) {
     int N = mesh.cells.size();
     if (limiters.size() != N) limiters.resize(N);
     
-    // 初始化所有单元限值为 1.0 (无限制)
+    // initialize all limiters to 1.0 (no limiting)
     std::fill(limiters.begin(), limiters.end(), 1.0);
 
-    // 对于结构松散的网格，我们需要用到节点的邻接信息
-    // 这里我们假设你网格中的面只提供了 f.owner 和 f.neighbor
-    
-    // 采用局部标量：例如使用压力 (Pressure) 作为限制的对象
-    // 如果你愿意，也可以对 u, v, T 分别计算 phi 然后取最小值
+    // using only f.owner and f.neighbor
+
     std::vector<double> P_cents(N);
     for (int i = 0; i < N; ++i) {
         P_cents[i] = getPressure(U_in[i]);
@@ -172,7 +169,7 @@ void Solver::computeLimiters(const std::vector<State>& U_in) {
         P_min[i] = P_cents[i];
     }
     
-    // 1. 扫描所有面，找出每个单元的局部最大压力和最小压力
+    // find min and max pressure
     for (const auto& f : mesh.faces) {
         int o = f.owner;
         int n = f.neighbor;
@@ -181,7 +178,7 @@ void Solver::computeLimiters(const std::vector<State>& U_in) {
         if (n >= 0) {
             p_ghost = P_cents[n];
         } else {
-            // 如果是边界，获取边界幽灵单元压力
+            // for ghost boundary
             State U_ghost = getBoundaryGhostState(U_in[o], f);
             p_ghost = getPressure(U_ghost);
         }
@@ -195,34 +192,29 @@ void Solver::computeLimiters(const std::vector<State>& U_in) {
         }
     }
     
-    // 2. 再次扫描所有面，计算每个面上的无限制重构压力，推导限制系数
-    // 我们需要能够累积向各个单元施加最严格（最小）的限制系数
-    const double eps = 1e-12; // 防止除以零的小量
+    // calculate alpha for each face and update limiters for owner and neighbor
+    // accumulate the most restrictive (smallest) limiting factor for each cell
+    const double eps = 1e-12; //  prevent division by zero
     
     for (const auto& f : mesh.faces) {
         int o = f.owner;
         int n = f.neighbor;
         
-        // 计算面向所有者单元中心的向量
+        // calculate the unlimited reconstructed pressure at the face center using the gradient from the owner cell
         double dx_o = f.x_mid - mesh.cells[o].x_c;
         double dy_o = f.y_mid - mesh.cells[o].y_c;
         
-        // 计算左侧无限制重构压力 P_L_f
-        // 假设你要通过当前代码结构里的梯度来算。对于压力，你需要提取它的梯度。
-        // 这里提供一个通过状态量重构出来的近似压力增量的方法：
-        // deltaP \approx P_cent * (dT/dx * dx + ...) ... 这种依赖已有的 u,v,T 梯度
-        // 或者比较稳妥的是在 computeGradients 里多存一个 dPdx，dPdy。
+        // calculate P_L_f (maybe need the gradient)
         
-        // 简便法：利用我们已有的 T 梯度和已有的 u, v, rho 假设它反映了类似压力梯度形变
         CellGradient gradO = cellGradients[o];
         double u_o = U_in[o].rhou / U_in[o].rho;
         double v_o = U_in[o].rhov / U_in[o].rho;
         double T_o = P_cents[o] / (U_in[o].rho * R_gas);
         
-        double T_o_f = T_o + 1.0 * (gradO.dTdx * dx_o + gradO.dTdy * dy_o); // 假设只限制温度主导的参数
+        double T_o_f = T_o + 1.0 * (gradO.dTdx * dx_o + gradO.dTdy * dy_o); 
         double P_o_f = U_in[o].rho * R_gas * T_o_f; 
         
-        // 计算 alpha
+        // calculate alpha
         double delta_2 = P_o_f - P_cents[o];
         double alpha_o = 1.0;
         if (delta_2 > 0.0) {
@@ -235,7 +227,7 @@ void Solver::computeLimiters(const std::vector<State>& U_in) {
         
         limiters[o] = std::min(limiters[o], alpha_o);
         
-        // --- 对于右侧单元(neighbor) ---
+        // neighbor
         if (n >= 0) {
             double dx_n = f.x_mid - mesh.cells[n].x_c;
             double dy_n = f.y_mid - mesh.cells[n].y_c;
@@ -265,12 +257,12 @@ void Solver::computeLimiters(const std::vector<State>& U_in) {
 
 
 
-// Venkat Limiter
+// Venkat Limiter (this is GPT version)
+
 // void Solver::computeLimiters(const std::vector<State>& U_in) {
 //     int N = mesh.cells.size();
 //     if (limiters.size() != N) limiters.resize(N);
     
-//     // 初始化所有单元限值为 1.0 (无限制)
 //     std::fill(limiters.begin(), limiters.end(), 1.0);
 
 //     std::vector<double> P_cents(N);
@@ -284,7 +276,7 @@ void Solver::computeLimiters(const std::vector<State>& U_in) {
 //         P_min[i] = P_cents[i];
 //     }
     
-//     // 1. 扫描所有面，找出每个单元的局部最大压力和最小压力
+//     // find max and min pressure
 //     for (const auto& f : mesh.faces) {
 //         int o = f.owner;
 //         int n = f.neighbor;
@@ -306,16 +298,15 @@ void Solver::computeLimiters(const std::vector<State>& U_in) {
 //         }
 //     }
     
-//     // 2. 再次扫描所有面，利用 Venkatakrishnan 光滑限制器计算 alpha
-//     // Venkatakrishnan 光滑系数 K，通常取 0.5 到 5.0 之间。
-//     // K 越大，允许的光滑波动越大，收敛性越好，但激波捕捉可能会变宽一点。默认先用 5.0。
+//     // using Venkatakrishnan limiter to calculate alpha
+
 //     double K_venkat = 5.0; 
     
 //     for (const auto& f : mesh.faces) {
 //         int o = f.owner;
 //         int n = f.neighbor;
         
-//         // ------------- Owner 侧 -------------
+//         // for Owner 
 //         double dx_o = f.x_mid - mesh.cells[o].x_c;
 //         double dy_o = f.y_mid - mesh.cells[o].y_c;
         
@@ -326,10 +317,10 @@ void Solver::computeLimiters(const std::vector<State>& U_in) {
         
 //         double delta_2_o = P_o_f - P_cents[o];
         
-//         // 计算 Venkat 保护微小量 eps^2 = (K * dx)^3 
+//         // calculate Venkat protection eps^2 = (K * dx)^3 
 //         double h_o = std::sqrt(mesh.cells[o].volume);
 //         double P_ref_o = P_cents[o];
-//         double eps_venkat_o = K_venkat * K_venkat * h_o * h_o * h_o * P_ref_o * P_ref_o; // 也可以不乘 P_ref，直接用物理量的立方
+//         double eps_venkat_o = K_venkat * K_venkat * h_o * h_o * h_o * P_ref_o * P_ref_o; 
 //         // double eps_venkat_o = K_venkat * K_venkat * h_o * h_o * h_o;
 
 //         double alpha_o = 1.0;
@@ -346,7 +337,7 @@ void Solver::computeLimiters(const std::vector<State>& U_in) {
 //         }
 //         limiters[o] = std::min(limiters[o], alpha_o);
         
-//         // ------------- Neighbor 侧 -------------
+//         // for Neighbor 
 //         if (n >= 0) {
 //             double dx_n = f.x_mid - mesh.cells[n].x_c;
 //             double dy_n = f.y_mid - mesh.cells[n].y_c;
@@ -378,6 +369,9 @@ void Solver::computeLimiters(const std::vector<State>& U_in) {
 //         }
 //     }
 // }
+
+
+// Venkat limiter (original version)
 
 // void Solver::computeLimiters(const std::vector<State>& U_in) {
 //     int N = mesh.cells.size();
@@ -629,7 +623,7 @@ void Solver::computeResiduals(const std::vector<State>& U_in, std::vector<State>
                     UR_recon = primitiveToConservative(rhoR_f, uR_f, vR_f, pR_f);
                     // UR_recon = primitiveToConservative(UR.rho, uR_f, vR_f, pR_f);
                 } else {
-                    // 如果是物理边界边界，采用一阶（即直接等于 Ghost State 或 Cell Center）
+                    // if physical bc, using 1st order
                     UL_recon = UL;
                     UR_recon = UR;
                 }
@@ -929,14 +923,14 @@ void Solver::computeResiduals(const std::vector<State>& U_in, std::vector<State>
 // for NASA supersonic test case
 
 // void Solver::initialize() {
-//     // 从总温和总压反算静温和静压（或者直接使用设定的 exit 压力）
+//     // calculate T_static and p_static from total conditions and Mach number
 //     double factor_T = 1.0 + 0.5 * (gamma - 1.0) * M_inf * M_inf;
 //     double T_static = T_total_inlet / factor_T;
 //     double p_static = P_static_exit; 
     
 //     double rho = p_static / (R_gas * T_static);
 //     double c = std::sqrt(gamma * R_gas * T_static);
-//     double u = M_inf * c; // 来流仅有水平速度 (零攻角)
+//     double u = M_inf * c; // zero angle
 //     double v = 0.0;
     
 //     State init = primitiveToConservative(rho, u, v, p_static);
@@ -964,41 +958,21 @@ void Solver::computeResiduals(const std::vector<State>& U_in, std::vector<State>
     
 //     std::cout << "Field initialized: PM Expansion (Mach 2.5)" << std::endl;
 // }
-// 在 Solver::initialize() 的最开头强制统一英制常数
-// void Solver::initialize() {
-//     this->gamma = 1.4;
-//     this->R_gas = 1716.48;  // <--- 修改为英制气体常数
 
-//     this->M_inf = 2.5;
-//     double p = 12.0 * 144.0; // <--- 注意：12 psia = 12 * 144 = 1728 lb/ft^2 (重要：压力必须使用 psf 来计算密度)
-//     double T = 550.0;        // Rankine
 
-//     double c = std::sqrt(gamma * R_gas * T); 
-//     double u = this->M_inf * c; 
-//     double v = 0.0;
-//     double rho = p / (R_gas * T); // 如果 p 是 psia，这算出来的会错，必须换成 psf
-    
-//     State init = primitiveToConservative(rho, u, v, p);
-//     std::fill(U_current.begin(), U_current.end(), init);
-    
-//     std::cout << "Field initialized: PM Expansion (Mach " << this->M_inf << ")" << std::endl;
-// }
 void Solver::initialize() {
     this->gamma = 1.4;
     this->R_gas = 1716.48;  
 
     this->M_inf = 2.5;
     
-    // --- 重点：NASA 给的是总压和总温 ---
     double P0_psia = 12.0;    
     double T0_R = 550.0;   
-    
-    // 根据马赫数反算静压(psia)和静温(Rankine)
+
     double factor_T = 1.0 + 0.5 * (this->gamma - 1.0) * this->M_inf * this->M_inf;
     double p_psia = P0_psia / std::pow(factor_T, this->gamma / (this->gamma - 1.0));
     double T = T0_R / factor_T;
 
-    // 转化为欧拉方程使用的基础单位 psf (1 psia = 144 psf)
     double p = p_psia * 144.0;
     
     double c = std::sqrt(this->gamma * this->R_gas * T); 
@@ -1150,7 +1124,7 @@ void Solver::initialize() {
 // }
 
 
-//corner case
+//pm case
 
 State Solver::getBoundaryGhostState(const State& U_in, const Face& f) {
     State U_ghost = U_in;
@@ -1170,7 +1144,7 @@ State Solver::getBoundaryGhostState(const State& U_in, const Face& f) {
     // }
     // --- BC Tag 1: Supersonic Inlet (Frozen Dirichlet) ---
     // if (f.bcTag == 1) {
-    //     this->R_gas = 1716.48;     // 保持一致
+    //     this->R_gas = 1716.48;     
     //     double p = 12.0 * 144.0;   // 1728.0 lb/ft^2
     //     double T = 550.0;
     //     double M = 2.5;
@@ -1449,30 +1423,29 @@ void Solver::computeDiagonalPreconditioner(std::vector<double>& D) {
         double v_f = 0.5 * (UL.rhov/UL.rho + UR.rhov/UR.rho);
         double vn = std::abs(u_f * f.nx + v_f * f.ny);
         
-        // 1. 无粘谱半径 (Inviscid Spectral Radius)
+        // Inviscid Spectral Radius
         double lambda_inv = vn + c_f;
         
-        // 2. 粘性谱半径估算 (Viscous Spectral Radius)
+        // Viscous Spectral Radius
         double dx = std::sqrt(mesh.cells[f.owner].volume); 
         double mu = 0.5 * (UL.rho + UR.rho) * nu;
         double lambda_visc = 2.0 * mu / (0.5 * (UL.rho + UR.rho) * dx + 1e-12);
         
-        // LLF 和 粘性通量的对角线贡献
+        // Total Spectral Radius
         double lambda_total = (lambda_inv + lambda_visc) * f.area;
         
-        // 累加到主对角线
         D[f.owner] += lambda_total * 0.5;
         if (f.neighbor >= 0) {
             D[f.neighbor] += lambda_total * 0.5;
         }
     }
 
-    // 添加源项对角线：伪时间步 (Vol / dt)
+    // Vol / dt
     for (int i = 0; i < N; ++i) {
         double vol = mesh.cells[i].volume;
         D[i] = (vol / (dt_local[i] + 1e-30)) + D[i];
         
-        // 保底防止除零
+        // avoid devide 0
         if (D[i] < 1e-12) D[i] = 1e-12;
     }
 }
@@ -1723,9 +1696,7 @@ void Solver::solveImplicit(double tolerance, int maxSteps) {
         
         bool should_update_limiter = true;
         
-        // --- 重点：冻结限制器打破 Limiter Ringing ---
-        // 在前几十步完成流场大结构建立后，果断停止更新 Limiter 向量
-        // 允许牛顿本轮迭代精确下降到机器零
+        // freeze limiter 
         if (step > 150 || CFL > 10.0) { 
             should_update_limiter = false;
         }
@@ -1749,8 +1720,8 @@ void Solver::solveImplicit(double tolerance, int maxSteps) {
         // 2. Solve Linear System J * dU = -R
         std::vector<State> RHS(N);
         for(int i = 0; i < N; ++i) {
-            // 牛顿方程：(Vol/dt * I + dR/dU) * dU = -R
-            // 但我们的 applyJacobian 中已经加了 Vol/dt 项，所以这里精确是 -R
+            // Newton：(Vol/dt * I + dR/dU) * dU = -R
+            // already add Vol/dt in 'applyJacobian', so here use -R
             RHS[i] = Residuals[i] * (-1.0);
         }
         
@@ -1763,20 +1734,18 @@ void Solver::solveImplicit(double tolerance, int maxSteps) {
             CFL *= 0.5;
             if (CFL <0.05) CFL = 0.05;
         }
-        // ---------------- 替换从第1682行开始的 Relaxation 逻辑 ----------------
         // 3. Update U^{k+1} = U^k + delta_U
-        // 对于平滑的膨胀波，直接使用全步长牛顿更新，只有在残差极大时稍微截断
+        // set relaxation 
         double relaxation = 1.0; 
         if (resVM > 1e6) {
-            relaxation = 0.5; // 只在启动初期缓冲一下
+            relaxation = 0.5; 
         } else if (resVM > 2e3 && resVM < 1e2){
             relaxation = 0.9;
         }
         
         for(int i = 0; i < N; ++i) {
             State U_new = U_current[i] + delta_U[i] * relaxation;
-            
-            // 强下溢保护
+        
             double k_energy = 0.5 * (U_new.rhou * U_new.rhou + U_new.rhov * U_new.rhov) / (U_new.rho + 1e-12);
             double p_new = (gamma - 1.0) * (U_new.rhoE - k_energy);
             
@@ -1793,20 +1762,17 @@ void Solver::solveImplicit(double tolerance, int maxSteps) {
             }
             U_current[i] = U_new;
         }
-
-        // ---------------- 替换从第1732行开始的 CFL Ramping 逻辑 ----------------
+        // control CFL
         if (step > 5) {
-            // 平滑流场非常适合大步长激进增长
             if (resVM > 1e6) {
                 CFL *= 1.2; 
             } else {
-                CFL *= 1.5; // 残差一旦回落，指数级攀升 CFL 寻找稳态
+                CFL *= 1.5; 
             }
             if (gmres_iters >= 25){
                 CFL *= 0.5;
             }
-            
-            // 取消之前硬编码的 50 的限制，允许拉高到 10000.0 以上
+
             double max_cfl = 10000; 
             
             if (CFL > max_cfl) {
@@ -1814,108 +1780,7 @@ void Solver::solveImplicit(double tolerance, int maxSteps) {
             }
             if (CFL < 0.1) CFL = 0.1;
         }
-        // 3. Update U^{k+1} = U^k + delta_U
-        // 对于 2.5 马赫，激波刚形成时更新步很大，我们需要保守一点：
-        // double relaxation = 1.0; 
-        // if (resVM > 1e7){
-        //     relaxation = 0.1;
-        // } else if (resVM > 2e6){
-        //     relaxation = 0.3;
-        // } else if (resVM > 5e5) {
-        //     relaxation = 0.5;
-        // } else if (resVM > 1e5) {
-        //     relaxation = 0.8;
-        // } else {
-        //     relaxation = 1.0; // FULL NEWTON UPDATE
-        // }
-        // // if (step > 100) relaxation = 1.0;
-        // // if (step > 50) relaxation = 1.0; // 后期激波稳定后允许全步长更新
-
-        // for(int i = 0; i < N; ++i) {
-        //     State U_new = U_current[i] + delta_U[i] * relaxation;
-            
-        //     // --- 强下溢保护：防止密度和压力跨越零 ---
-        //     double k_energy = 0.5 * (U_new.rhou * U_new.rhou + U_new.rhov * U_new.rhov) / (U_new.rho + 1e-12);
-        //     double p_new = (gamma - 1.0) * (U_new.rhoE - k_energy);
-            
-        //     // 如果更新后导致物理量变得荒谬，我们就对增量进行截断 (或者放弃该网格的面更新)
-        //     if (U_new.rho < 1e-2 || p_new < 1e-2) {
-        //         // 非常极端的阻尼，几乎只让他随显式残差缓慢蠕动
-        //         U_new = U_current[i] + delta_U[i] * 0.05; 
-                
-        //         // 再兜底一次
-        //         if (U_new.rho < 1e-2) U_new.rho = 1e-2;
-        //         double k_e2 = 0.5 * (U_new.rhou * U_new.rhou + U_new.rhov * U_new.rhov) / U_new.rho;
-        //         if ((U_new.rhoE - k_e2) < 1e-2) U_new.rhoE = k_e2 + 1e-2;
-        //     }
-            
-        //     U_current[i] = U_new;
-        // }
-
-        // // --- CFL Ramping ---
-        // // if (step > 5){
-        // //     if (resVM < 1e-3 && CFL < 10){
-        // //         CFL *= 1.1;
-        // //     } else if (CFL < 5.0){
-        // //         CFL *= 1.05;
-        // //         double max_cfl = (iSpatialScheme == SpatialScheme::FIRST_ORDER)? 5.0 : 0.8;
-        // //         if (CFL > max_cfl){
-        // //             CFL = max_cfl;
-        // //         }
-        // //         if (CFL > 1.0) CFL = 1.0;
-        // //     }
-        // // }
-        // // --- CFL Ramping ---
-        // // --- CFL Ramping ---
-        // if (step > 5) {
-        //     if (resVM > 1e7) {
-        //         // EXTREMELY HIGH RESIDUAL: Drop CFL drastically to recover physics!
-        //         CFL *= 0.5;
-        //     } else if (resVM > 2e6) {
-        //         // High but stable residual: hold steady 
-        //         CFL *= 1.0;
-        //     } else if (resVM > 5e5) {
-        //         CFL *= 1.05;
-        //     } else if (resVM > 1e5) {
-        //         CFL *= 1.2;
-        //     } else {
-        //         CFL *= 2.0;    // Once transient initial shock passes, ramp wildly!
-        //     }
-            
-        //     double max_cfl = (iSpatialScheme == SpatialScheme::FIRST_ORDER) ? 500.0 : 50.0;
-        //     if (CFL > max_cfl) {
-        //         CFL = max_cfl;
-        //     }
-        //     if (CFL < 0.05) CFL = 0.05; // Prevent CFL from collapsing completely
-        // }
-        // if (step > 500){
-        //     if (gmres_iters >= 25 || resVM > 1e7){
-        //         CFL *= 0.5;
-        //     }else if (gmres_iters < 15 && resVM < 1e5){
-        //         CFL *= 1.1;
-        //     }
-
-        //     double max_cfl = (iSpatialScheme == SpatialScheme::FIRST_ORDER)? 3.0 : 0.8;
-        //     if (CFL > max_cfl) CFL = max_cfl;
-        //     if (CFL < 0.01) CFL = 0.01;
-        // }
-        // if (step > 50){
-        //     if (resVM > 2e6 || gmres_iters >= 29){
-        //         CFL *= 0.5;
-        //         relaxation = 0.3;
-        //         if (CFL < 0.05) CFL = 0.05;
-        //     } else if (gmres_iters < 20 && resVM < 5e5 ) {
-        //         CFL *= 1.1;
-        //         relaxation = 1.0;
-        //     }
-        //     double max_cfl = (iSpatialScheme == SpatialScheme::FIRST_ORDER)? 1000.0 : 100.0;
-        //     if (CFL > max_cfl) CFL = max_cfl;
-        //     if (CFL < 0.1) CFL = 0.1;
-        // }
-        // if (resVM < 2e-6){
-        //     std::cout << "Judged as successful" << std::endl;
-        //     break;but
-        // }
+        
     }
 }
 
@@ -2042,37 +1907,37 @@ void Solver::extractSkinFriction(const std::string& filename) {
         if (f.neighbor < 0 && f.bcTag == 4) {
             State UL = U_current[f.owner];            
             
-            // 1. 获取紧贴壁面那层网格中心的流速
+            // calculate velocity at face center (x_mid, y_mid) using cell-centered value from owner cell
             double u_c = UL.rhou / UL.rho;
             double v_c = UL.rhov / UL.rho;
             
-            // 2. 计算流向与壁面平行方向（切向）的速度大小
-            // 定义切向量 t = (-ny, nx)
+            // calculate the tangential direction vector (tx, ty) which is perpendicular to the normal (nx, ny)
+            // t = (-ny, nx)
             double tx = -f.ny;
             double ty =  f.nx;
-            if (tx < 0) { // 强行让切向沿着 x 的正方向
+            if (tx < 0) { 
                 tx = -tx;
                 ty = -ty;
             }
             
-            // 这个速度带有正负号，正值表示纯流向，负值表示回流（分离）
+            // the positive value stands for flow direction from left to right, which is consistent with the definition of x in the problem
             double u_tangent = u_c * tx + v_c * ty; 
             
-            // 3. 精确计算从网格形心 (x_c, y_c) 到壁面 (面中心 x_mid, y_mid) 的纯法向距离 dn
+            // caculate dn from (x_c, y_c)  to (x_mid, y_mid) 
             double dx = f.x_mid - mesh.cells[f.owner].x_c;
             double dy = f.y_mid - mesh.cells[f.owner].y_c;
             
-            // 使用平面几何中的点到直线距离公式: dn = |dx * nx + dy * ny|
+            // dn = |dx * nx + dy * ny|
             double dn = std::abs(dx * f.nx + dy * f.ny);
-            if (dn < 1e-12) dn = 1e-12; // 防止浮点数分母过小除零
+            if (dn < 1e-12) dn = 1e-12; 
             
-            // 4. 使用标准的一阶差分计算壁面法向梯度: dudy = (u_tangent - u_wall) / dn
-            // 因为不可滑移壁面 u_wall = 0
+            // dudy = (u_tangent - u_wall) / dn
+            // u_wall = 0
             double dudn = u_tangent / dn;
             
-            // 5. 计算表面剪切应力和 Cf
+            // calculate skin friction coefficient
             double mu = UL.rho * nu; 
-            double tau_w = mu * dudn; // 这里如果出现回流，dudn 会是负的，刚好得到负的 Cf
+            double tau_w = mu * dudn; 
             
             double Cf = tau_w / q_inf;
 
@@ -2101,12 +1966,12 @@ void Solver::extractSkinFriction(const std::string& filename) {
 
 void Solver::computeWallDistances() {
     int N = mesh.cells.size();
-    wallDistances.assign(N, 1e10); // 初始化为非常大的数
+    wallDistances.assign(N, 1e10); 
 
-    // 收集所有的壁面 (比如 Tag 4 是粘性壁面)
+    
     std::vector<Face> viscousWalls;
     for (const auto& f : mesh.faces) {
-        if (f.neighbor < 0 && f.bcTag == 4) { // 请根据湍流网格的设定调整Tag
+        if (f.neighbor < 0 && f.bcTag == 4) { 
             viscousWalls.push_back(f);
         }
     }
@@ -2116,15 +1981,15 @@ void Solver::computeWallDistances() {
         return;
     }
 
-    // 暴力法遍历计算每个 cell 到壁面的最短距离 
-    // (对于 2D 问题且网格只有几万的话，O(N*N_walls) 初始化大概瞬间就跑完了)
+    // calculate distance from each cell center to the nearest viscous wall face center
+    // simplest way: for each cell, loop over all viscous wall faces and find the minimum distance
     for (int i = 0; i < N; ++i) {
         double min_d2 = 1e20;
         double cx = mesh.cells[i].x_c;
         double cy = mesh.cells[i].y_c;
         
         for (const auto& f : viscousWalls) {
-            // 这里用面中心作为近似，严格来说应该计算点到线段的垂距
+            
             double dx = cx - f.x_mid;
             double dy = cy - f.y_mid;
             double d2 = dx*dx + dy*dy;
@@ -2152,10 +2017,8 @@ void Solver::extractWallPressure(const std::string& filename) {
         return;
     }
 
-    // 表头：包含 x(inch), p(psi) 为了直接和图7对照
     outFile << "x_in, p_psi\n";
 
-    // 用于收集和排序各个被采样点
     struct SamplePoint {
         double x;
         double p;
@@ -2170,16 +2033,12 @@ void Solver::extractWallPressure(const std::string& filename) {
             int c_idx = f.owner;
             double y_c = mesh.cells[c_idx].y_c;
             
-            // 过滤出真正代表 "Expansion fan centerline / wall" 的底部边界单元
-            // 考虑到上边界的 y_c 接近 1.0 (英尺)，底部接近 0.0 到 -0.32
             if (y_c < 0.2) {  
-                double x_ft = f.x_mid; // 网格自带的通常是 ft
-                double x_in = x_ft * 12.0; // 转换为 inch
-                
-                // 获取物面邻近网格的绝对压力 (psf)
+                double x_ft = f.x_mid; 
+                double x_in = x_ft * 12.0; 
+
                 double p_psf = getPressure(U_current[c_idx]);
-                
-                // 将 psf (lb/ft^2) 转换回 psia (lb/in^2) 
+
                 double p_psi = p_psf / 144.0;
                 
                 samples.push_back({x_in, p_psi});
@@ -2187,10 +2046,8 @@ void Solver::extractWallPressure(const std::string& filename) {
         }
     }
 
-    // 按照 X 坐标从入口到出口进行排序
     std::sort(samples.begin(), samples.end());
 
-    // 写入文件
     for (const auto& sp : samples) {
         outFile << sp.x << ", " << sp.p << "\n";
     }
