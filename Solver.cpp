@@ -8,7 +8,7 @@ Solver::Solver(const Mesh& m) : mesh(m) {
     U_current.resize(mesh.cells.size());
     Residuals.resize(mesh.cells.size());
 }
-
+//test
 void Solver::setFlowConditions(double M_inf_in, double P_ref, double T_ref) {
     // calculate total pressure and temperature at inlet
     // T0 = T * (1 + (gamma-1)/2 * M^2)
