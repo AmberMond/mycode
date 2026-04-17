@@ -239,7 +239,7 @@ void saveResults(const Mesh& mesh, const std::vector<State>& U, int step) {
 
 int main(){
     Mesh mesh;
-    mesh.load("pm_1x");
+    mesh.load("mesh/pm_1x");
 
     Solver solver(mesh);
     solver.setNumericalMethod(FluxScheme::HLLC, SpatialScheme::SECOND_ORDER_LIMITED);
