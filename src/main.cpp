@@ -6,7 +6,7 @@
 
 // vtk output
 void saveResults(const Mesh& mesh, const std::vector<State>& U, int step) {
-    std::string filename = "sol_" + std::to_string(step) + ".vtk";
+    std::string filename = "results/sol_" + std::to_string(step) + ".vtk";
     std::ofstream file(filename);
     if (!file.is_open()) return;
 
@@ -250,7 +250,7 @@ int main(){
     solver.solveImplicit(1e-6, 500000);
     std::cout << "Done implicit" << std::endl;
     saveResults(mesh, solver.getSolution(), 9999);
-    solver.extractWallPressure("pm_centerline.csv");
+    solver.extractWallPressure("results/pm_centerline.csv");
     std::cout<< "done" << std::endl;
     return 0;
 }

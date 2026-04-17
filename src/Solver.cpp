@@ -1685,7 +1685,7 @@ void Solver::solveImplicit(double tolerance, int maxSteps) {
     
     // give the initial CFL with a reasonable number
     double CFL = 0.1; 
-    std::ofstream resFile("residual_history.csv");
+    std::ofstream resFile("results/residual_history.csv");
     resFile << "Step, Residual_VM\n";
     // Newton Loop
     for (int step = 0; step < maxSteps; ++step) {
