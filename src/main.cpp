@@ -53,7 +53,7 @@ void saveResults(const Mesh& mesh, const std::vector<State>& U, int step) {
 // int main() {
 //     Mesh mesh;
 //     // mesh
-//     mesh.load("bump_1230_t8"); 
+//     mesh.load("mesh/bump_1230"); 
 
 //     Solver solver(mesh);
 
@@ -183,38 +183,38 @@ void saveResults(const Mesh& mesh, const std::vector<State>& U, int step) {
 // for NASA laminar flat plate
 
 
-// int main() {
-//     Mesh mesh;
-//     // Load your flat plate unstructured mesh
-//     mesh.load("new_laminar_flat_plate"); 
+int main() {
+    Mesh mesh;
+    // Load your flat plate unstructured mesh
+    mesh.load("mesh/new_laminar_flat_plate"); 
 
-//     Solver solver(mesh);
+    Solver solver(mesh);
 
-//     solver.setNumericalMethod(FluxScheme::HLLC, SpatialScheme::SECOND_ORDER_CENTRAL);
-//     // Convert Flow conditions to SI if needed: 
-//     // Mach 0.1, P_static = 41368.5 Pa, T_static = 388.89 K
-//     solver.setFlowConditions(0.1, 41368.5, 388.89);
+    solver.setNumericalMethod(FluxScheme::HLLC, SpatialScheme::SECOND_ORDER_CENTRAL);
+    // Convert Flow conditions to SI if needed: 
+    // Mach 0.1, P_static = 41368.5 Pa, T_static = 388.89 K
+    solver.setFlowConditions(0.1, 41368.5, 388.89);
     
-//     // Add Viscosity initialization for flat plate (Re=200k, L=0.3048m)
-//     solver.setKinematicViscosity(200000.0, 0.3048);
+    // Add Viscosity initialization for flat plate (Re=200k, L=0.3048m)
+    solver.setKinematicViscosity(200000.0, 0.3048);
     
-//     solver.initialize();
+    solver.initialize();
 
-//     std::cout << "Starting simulation JFNK..." << std::endl;
-//     // You might need a smaller CFL or local timestep since viscous cells near the wall are tiny
-//     solver.solveImplicit(1e-4, 50000); 
-//     double L = 0.3048;
-//     solver.extractBoundaryLayerProfile(L, "bl_profile.csv");
-//     solver.extractSkinFriction("cf_profile.csv");
-//     saveResults(mesh, solver.getSolution(), 9999);
-//     return 0;
-// }
+    std::cout << "Starting simulation JFNK..." << std::endl;
+    // You might need a smaller CFL or local timestep since viscous cells near the wall are tiny
+    solver.solveImplicit(1e-4, 50000); 
+    double L = 0.3048;
+    solver.extractBoundaryLayerProfile(L, "bl_profile.csv");
+    solver.extractSkinFriction("cf_profile.csv");
+    saveResults(mesh, solver.getSolution(), 9999);
+    return 0;
+}
 
 
 // SWBLI mach 5 shock wave:
 // int main() {
 //     Mesh mesh;
-//     mesh.load("swbli_8x"); 
+//     mesh.load("mesh/swbli_8x"); 
 
 //     Solver solver(mesh);
 //     solver.setFreestreamStatic(5.0, 4006.88, 68.33);
@@ -235,22 +235,23 @@ void saveResults(const Mesh& mesh, const std::vector<State>& U, int step) {
 // }
 
 
+
+
 // pm
+// int main(){
+//     Mesh mesh;
+//     mesh.load("mesh/pm_nasa_v1");
 
-int main(){
-    Mesh mesh;
-    mesh.load("mesh/pm_1x");
+//     Solver solver(mesh);
+//     solver.setNumericalMethod(FluxScheme::ROE, SpatialScheme::SECOND_ORDER_CENTRAL);
+//     solver.initialize();
 
-    Solver solver(mesh);
-    solver.setNumericalMethod(FluxScheme::HLLC, SpatialScheme::SECOND_ORDER_LIMITED);
-    solver.initialize();
+//     std::cout<< "Start implicit" << std::endl;
 
-    std::cout<< "Start implicit" << std::endl;
-
-    solver.solveImplicit(1e-6, 500000);
-    std::cout << "Done implicit" << std::endl;
-    saveResults(mesh, solver.getSolution(), 9999);
-    solver.extractWallPressure("results/pm_centerline.csv");
-    std::cout<< "done" << std::endl;
-    return 0;
-}
+//     solver.solveImplicit(1e-6, 500000);
+//     std::cout << "Done implicit" << std::endl;
+//     saveResults(mesh, solver.getSolution(), 9999);
+//     solver.extractWallPressure("results/pm_centerline.csv");
+//     std::cout<< "done" << std::endl;
+//     return 0;
+// }
