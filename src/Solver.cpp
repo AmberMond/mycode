@@ -43,26 +43,26 @@ void Solver::setKinematicViscosity(double Re, double L_ref) {
 }
 
 // for 2d bump
-// void Solver::initialize() {
-//     // inititalize : uniform flow
+void Solver::initialize() {
+    // inititalize : uniform flow
     
-//     double p = P_static_exit;
-//     // T = T0 / (1 + (g-1)/2 * M^2) 
-//     double factor_T = std::pow(P_total_inlet / p, (gamma - 1.0) / gamma); // Isentropic relation
-//     double T = T_total_inlet / factor_T;
+    double p = P_static_exit;
+    // T = T0 / (1 + (g-1)/2 * M^2) 
+    double factor_T = std::pow(P_total_inlet / p, (gamma - 1.0) / gamma); // Isentropic relation
+    double T = T_total_inlet / factor_T;
     
-//     double rho = p / (R_gas * T);
-//     double c = std::sqrt(gamma * R_gas * T);
+    double rho = p / (R_gas * T);
+    double c = std::sqrt(gamma * R_gas * T);
     
-//     // u^2 = M^2 * c^2 
-//     double V = std::sqrt(2.0 * (gamma * R_gas / (gamma - 1.0)) * (T_total_inlet - T));
+    // u^2 = M^2 * c^2 
+    double V = std::sqrt(2.0 * (gamma * R_gas / (gamma - 1.0)) * (T_total_inlet - T));
     
     
-//     State init = primitiveToConservative(rho, V, 0.0, p);
-//     std::fill(U_current.begin(), U_current.end(), init);
+    State init = primitiveToConservative(rho, V, 0.0, p);
+    std::fill(U_current.begin(), U_current.end(), init);
     
-//     std::cout << "Field initialized with M=" << V/c << ", P=" << p << std::endl;
-// }
+    std::cout << "Field initialized with M=" << V/c << ", P=" << p << std::endl;
+}
 
 
 // for wind tunnel
@@ -784,12 +784,12 @@ void Solver::computeResiduals(const std::vector<State>& U_in, std::vector<State>
         FluxVisc.rhoE = work_x * f.nx + work_y * f.ny;
 
         //  C. Total Flux = F_Euler - F_Viscous  _______________ for viscous term
-        State TotalFlux = FluxEuler - FluxVisc;
+        // State TotalFlux = FluxEuler - FluxVisc;
 
 
         // for inviscous term:
 
-        // State TotalFlux = FluxEuler;
+        State TotalFlux = FluxEuler;
 
         // accumulate residuals 
         double mag = f.area;
@@ -799,88 +799,68 @@ void Solver::computeResiduals(const std::vector<State>& U_in, std::vector<State>
         }
     }
 }
-// void Solver::initializeTGV(){
-//     double V0 = 1.0;
-//     double p0 = 100000.0;
-//     double rho0 = 1.225;
 
-//     for (int i = 0; i < mesh.cells.size(); ++i){
-//         double x = mesh.cells[i].x_c;
-//         double y = mesh.cells[i].y_c;
-
-//         //theorytical TGV solution
-
-//         double u = V0 * std::sin(x) * std::cos(y);
-//         double v = -V0 * std::cos(x) * std::sin(y);
-
-//         // p
-//         double p = p0 + (rho0 * V0 * V0 / 4.0) * (std::cos(2.0 * x) + std::cos(2.0 * y));
-
-//         U_current[i] = primitiveToConservative(rho0, u, v, p);
-//     }
-//     std::cout << "Field initialized with 2D TGV exact solution" << std::endl;
-// }
 
 // for 2d bump
 // // set boundary ghost state
-// State Solver::getBoundaryGhostState(const State& U_in, const Face& f) {
-//     State U_ghost = U_in;
+State Solver::getBoundaryGhostState(const State& U_in, const Face& f) {
+    State U_ghost = U_in;
 
-//     // --- BC Tag 1: Subsonic Inlet (Given P0, T0) ---
-//     if (f.bcTag == 1) {
+    // --- BC Tag 1: Subsonic Inlet (Given P0, T0) ---
+    if (f.bcTag == 1) {
         
         
-//         double p_in = getPressure(U_in);
+        double p_in = getPressure(U_in);
         
-//         // avoid NaN value
-//         double p_use = std::min(p_in, P_total_inlet - 1e-4); 
+        // avoid NaN value
+        double p_use = std::min(p_in, P_total_inlet - 1e-4); 
 
-//         //Isentropic relations:
-//         // T = T0 * (P/P0)^((g-1)/g)
-//         double T_ghost = T_total_inlet * std::pow(p_use / P_total_inlet, (gamma - 1.0) / gamma);
-//         double rho_ghost = p_use / (R_gas * T_ghost);
+        //Isentropic relations:
+        // T = T0 * (P/P0)^((g-1)/g)
+        double T_ghost = T_total_inlet * std::pow(p_use / P_total_inlet, (gamma - 1.0) / gamma);
+        double rho_ghost = p_use / (R_gas * T_ghost);
         
-//         // Velocity magnitude from Energy equation: V^2 = 2Cp(T0 - T)
-//         double Cp = gamma * R_gas / (gamma - 1.0);
-//         double V2 = 2.0 * Cp * (T_total_inlet - T_ghost);
-//         double V = (V2 > 0) ? std::sqrt(V2) : 0.0;
+        // Velocity magnitude from Energy equation: V^2 = 2Cp(T0 - T)
+        double Cp = gamma * R_gas / (gamma - 1.0);
+        double V2 = 2.0 * Cp * (T_total_inlet - T_ghost);
+        double V = (V2 > 0) ? std::sqrt(V2) : 0.0;
 
        
-//         U_ghost = primitiveToConservative(rho_ghost, V, 0.0, p_use);
-//     }
-//     // --- BC Tag 2: Outlet (Given Static Pressure) ---
-//     else if (f.bcTag == 2) {
-//         // subsonic outlet P_exit
+        U_ghost = primitiveToConservative(rho_ghost, V, 0.0, p_use);
+    }
+    // --- BC Tag 2: Outlet (Given Static Pressure) ---
+    else if (f.bcTag == 2) {
+        // subsonic outlet P_exit
         
-//         double p_target = P_static_exit;
+        double p_target = P_static_exit;
         
-//         double rho = U_in.rho;
-//         double u = U_in.rhou / U_in.rho;
-//         double v = U_in.rhov / U_in.rho;
+        double rho = U_in.rho;
+        double u = U_in.rhou / U_in.rho;
+        double v = U_in.rhov / U_in.rho;
         
-//         // set others
-//         U_ghost = primitiveToConservative(rho, u, v, p_target);
-//     }
-//     // --- BC Tag 3: Slip Wall ---
-//     else if (f.bcTag == 3) {
+        // set others
+        U_ghost = primitiveToConservative(rho, u, v, p_target);
+    }
+    // --- BC Tag 3: Slip Wall ---
+    else if (f.bcTag == 3) {
         
-//         double u = U_in.rhou / U_in.rho;
-//         double v = U_in.rhov / U_in.rho;
+        double u = U_in.rhou / U_in.rho;
+        double v = U_in.rhov / U_in.rho;
         
-//         double vn = u * f.nx + v * f.ny;
+        double vn = u * f.nx + v * f.ny;
         
-//         // V_ghost
-//         double u_g = u - 2.0 * vn * f.nx;
-//         double v_g = v - 2.0 * vn * f.ny;
+        // V_ghost
+        double u_g = u - 2.0 * vn * f.nx;
+        double v_g = v - 2.0 * vn * f.ny;
         
-//         U_ghost.rho = U_in.rho;
-//         U_ghost.rhou = U_in.rho * u_g;
-//         U_ghost.rhov = U_in.rho * v_g;
-//         U_ghost.rhoE = U_in.rhoE; 
-//     }
+        U_ghost.rho = U_in.rho;
+        U_ghost.rhou = U_in.rho * u_g;
+        U_ghost.rhov = U_in.rho * v_g;
+        U_ghost.rhoE = U_in.rhoE; 
+    }
 
-//     return U_ghost;
-// }
+    return U_ghost;
+}
 
 
 // // for wind tunnel
@@ -907,7 +887,7 @@ void Solver::computeResiduals(const std::vector<State>& U_in, std::vector<State>
         
 //         double vn = u * f.nx + v * f.ny;
         
-//         
+        
 //         double u_g = u - 2.0 * vn * f.nx;
 //         double v_g = v - 2.0 * vn * f.ny;
         
@@ -922,22 +902,22 @@ void Solver::computeResiduals(const std::vector<State>& U_in, std::vector<State>
 
 // for NASA supersonic test case
 
-void Solver::initialize() {
-    // calculate T_static and p_static from total conditions and Mach number
-    double factor_T = 1.0 + 0.5 * (gamma - 1.0) * M_inf * M_inf;
-    double T_static = T_total_inlet / factor_T;
-    double p_static = P_static_exit; 
+// void Solver::initialize() {
+//     // calculate T_static and p_static from total conditions and Mach number
+//     double factor_T = 1.0 + 0.5 * (gamma - 1.0) * M_inf * M_inf;
+//     double T_static = T_total_inlet / factor_T;
+//     double p_static = P_static_exit; 
     
-    double rho = p_static / (R_gas * T_static);
-    double c = std::sqrt(gamma * R_gas * T_static);
-    double u = M_inf * c; // zero angle
-    double v = 0.0;
+//     double rho = p_static / (R_gas * T_static);
+//     double c = std::sqrt(gamma * R_gas * T_static);
+//     double u = M_inf * c; // zero angle
+//     double v = 0.0;
     
-    State init = primitiveToConservative(rho, u, v, p_static);
-    std::fill(U_current.begin(), U_current.end(), init);
+//     State init = primitiveToConservative(rho, u, v, p_static);
+//     std::fill(U_current.begin(), U_current.end(), init);
     
-    std::cout << "Field initialized with Ma = " << M_inf << ", P = " << p_static << std::endl;
-}
+//     std::cout << "Field initialized with Ma = " << M_inf << ", P = " << p_static << std::endl;
+// }
 
 // corner case
 // void Solver::initialize() {
@@ -986,26 +966,7 @@ void Solver::initialize() {
 //     std::cout << "Field initialized: PM Expansion (P_static_psia = " << p_psia << ")" << std::endl;
 // }
 
-// // For TGV
-// State Solver::getBoundaryGhostState(const State& U_in, const Face& f){
-//     double x = f.x_mid;
-//     double y = f.y_mid;
 
-//     double V0 = 1.0;
-//     double p0 = 100000.0;
-//     double rho0 = 1.225;
-
-//     double F_decay = std::exp(-2.0 * nu * physical_time);
-//     double P_decay = std::exp(-4.0 * nu * physical_time);
-
-//     double u = V0 * std::sin(x) * std::cos(y) * F_decay;
-//     double v = -V0 * std::cos(x) * std::sin(y) * F_decay;
-
-//     double p = p0 + (rho0 * V0 * V0 / 4.0) * (std::cos(2.0 * x) + std::cos(2.0 * y)) * P_decay;
-
-//     return primitiveToConservative(rho0, u, v, p);
-
-// }
 
 // for NASA supersonic test case
 
@@ -1051,78 +1012,131 @@ void Solver::initialize() {
 
 
 // for laminar flat plate
-State Solver::getBoundaryGhostState(const State& U_in, const Face& f) {
-    State U_ghost = U_in;
+// State Solver::getBoundaryGhostState(const State& U_in, const Face& f) {
+//     State U_ghost = U_in;
 
-    // --- BC Tag 1 & 5: Subsonic Inlet & Farfield ---
-    if (f.bcTag == 1 || f.bcTag == 5) {
-        // Enforce incoming Mach, T, and P. 
-        double factor_T = 1.0 + 0.5 * (gamma - 1.0) * M_inf * M_inf;
-        double T_static = T_total_inlet / factor_T;
-        double rho_inf = P_static_exit / (R_gas * T_static);
-        double c_inf = std::sqrt(gamma * R_gas * T_static);
-        double u_inf = M_inf * c_inf;
+//     // --- BC Tag 1 & 5: Subsonic Inlet & Farfield ---
+//     if (f.bcTag == 1 || f.bcTag == 5) {
+//         // Enforce incoming Mach, T, and P. 
+//         double factor_T = 1.0 + 0.5 * (gamma - 1.0) * M_inf * M_inf;
+//         double T_static = T_total_inlet / factor_T;
+//         double rho_inf = P_static_exit / (R_gas * T_static);
+//         double c_inf = std::sqrt(gamma * R_gas * T_static);
+//         double u_inf = M_inf * c_inf;
         
-        U_ghost = primitiveToConservative(rho_inf, u_inf, 0.0, P_static_exit);
-    }
-    // --- BC Tag 2: Subsonic Outlet ---
-    else if (f.bcTag == 2) {
-        // Enforce fixed pressure, extrapolate velocity and density
-        // double rho = U_in.rho;
-        // double u = U_in.rhou / U_in.rho;
-        // double v = U_in.rhov / U_in.rho;
-        // U_ghost = primitiveToConservative(rho, u, v, P_static_exit);
+//         U_ghost = primitiveToConservative(rho_inf, u_inf, 0.0, P_static_exit);
+//     }
+//     // --- BC Tag 2: Subsonic Outlet ---
+//     else if (f.bcTag == 2) {
+//         // Enforce fixed pressure, extrapolate velocity and density
+//         // double rho = U_in.rho;
+//         // double u = U_in.rhou / U_in.rho;
+//         // double v = U_in.rhov / U_in.rho;
+//         // U_ghost = primitiveToConservative(rho, u, v, P_static_exit);
 
 
-        // for mach 5 case:
-        U_ghost = U_in;
-    }
-    // --- BC Tag 3: Slip Wall (Upstream of leading edge) ---
-    else if (f.bcTag == 3) {
-        double u = U_in.rhou / U_in.rho;
-        double v = U_in.rhov / U_in.rho;
-        double vn = u * f.nx + v * f.ny;
+//         // for mach 5 case:
+//         U_ghost = U_in;
+//     }
+//     // --- BC Tag 3: Slip Wall (Upstream of leading edge) ---
+//     else if (f.bcTag == 3) {
+//         double u = U_in.rhou / U_in.rho;
+//         double v = U_in.rhov / U_in.rho;
+//         double vn = u * f.nx + v * f.ny;
         
-        double u_g = u - 2.0 * vn * f.nx;
-        double v_g = v - 2.0 * vn * f.ny;
+//         double u_g = u - 2.0 * vn * f.nx;
+//         double v_g = v - 2.0 * vn * f.ny;
         
-        U_ghost.rho = U_in.rho;
-        U_ghost.rhou = U_in.rho * u_g;
-        U_ghost.rhov = U_in.rho * v_g;
-        U_ghost.rhoE = U_in.rhoE; 
-    }
-    // --- BC Tag 4: Flat Plate (No-Slip Wall) ---
-    else if (f.bcTag == 4) {
-        // Reverse velocity to enforce zero flow
-        // double u_g = - (U_in.rhou / U_in.rho);
-        // double v_g = - (U_in.rhov / U_in.rho);
+//         U_ghost.rho = U_in.rho;
+//         U_ghost.rhou = U_in.rho * u_g;
+//         U_ghost.rhov = U_in.rho * v_g;
+//         U_ghost.rhoE = U_in.rhoE; 
+//     }
+//     // --- BC Tag 4: Flat Plate (No-Slip Wall) ---
+//     else if (f.bcTag == 4) {
+//         // Reverse velocity to enforce zero flow
+//         // double u_g = - (U_in.rhou / U_in.rho);
+//         // double v_g = - (U_in.rhov / U_in.rho);
         
-        // U_ghost.rho = U_in.rho;
-        // U_ghost.rhou = U_in.rho * u_g;
-        // U_ghost.rhov = U_in.rho * v_g;
-        // U_ghost.rhoE = U_in.rhoE; 
+//         // U_ghost.rho = U_in.rho;
+//         // U_ghost.rhou = U_in.rho * u_g;
+//         // U_ghost.rhov = U_in.rho * v_g;
+//         // U_ghost.rhoE = U_in.rhoE; 
 
-        // for mach 5 case:
-        double u_g = - (U_in.rhou / U_in.rho);
-        double v_g = - (U_in.rhov / U_in.rho);
+//         // for mach 5 case:
+//         double u_g = - (U_in.rhou / U_in.rho);
+//         double v_g = - (U_in.rhov / U_in.rho);
 
-        double ek_in = 0.5 * (U_in.rhou * U_in.rhou + U_in.rhov * U_in.rhov) / U_in.rho;
-        double p_in = (gamma - 1.0) * (U_in.rhoE - ek_in);
-        double T_in = p_in / (U_in.rho * R_gas);
+//         double ek_in = 0.5 * (U_in.rhou * U_in.rhou + U_in.rhov * U_in.rhov) / U_in.rho;
+//         double p_in = (gamma - 1.0) * (U_in.rhoE - ek_in);
+//         double T_in = p_in / (U_in.rho * R_gas);
 
-        // double T_wall = 300.0;
-        // double T_ghost = 2.0 * T_wall - T_in; // mirror temperature for adiabatic wall
-        // if (T_ghost <= 10.0) T_ghost = T_wall;
-        double T_ghost = T_in;
-        double rho_g = p_in / (R_gas * T_ghost);
-        double k_in = 0.0, omega_in = 0.0;
+//         // double T_wall = 300.0;
+//         // double T_ghost = 2.0 * T_wall - T_in; // mirror temperature for adiabatic wall
+//         // if (T_ghost <= 10.0) T_ghost = T_wall;
+//         double T_ghost = T_in;
+//         double rho_g = p_in / (R_gas * T_ghost);
+//         double k_in = 0.0, omega_in = 0.0;
 
-        U_ghost = primitiveToConservative(rho_g, u_g, v_g, p_in, k_in, omega_in);
-    }
+//         U_ghost = primitiveToConservative(rho_g, u_g, v_g, p_in, k_in, omega_in);
+//     }
 
-    return U_ghost;
-}
+//     return U_ghost;
+// }
 
+// for laminar flat plate / SWBLI mach 5 case
+// State Solver::getBoundaryGhostState(const State& U_in, const Face& f) {
+//     State U_ghost = U_in;
+
+//     // --- BC Tag 1 & 5: Subsonic Inlet & Farfield ---
+//     if (f.bcTag == 1 || f.bcTag == 5) {
+//         // Enforce incoming Mach, T, and P. 
+//         double factor_T = 1.0 + 0.5 * (gamma - 1.0) * M_inf * M_inf;
+//         double T_static = T_total_inlet / factor_T;
+//         double rho_inf = P_static_exit / (R_gas * T_static);
+//         double c_inf = std::sqrt(gamma * R_gas * T_static);
+//         double u_inf = M_inf * c_inf;
+        
+//         U_ghost = primitiveToConservative(rho_inf, u_inf, 0.0, P_static_exit);
+//     }
+//     // --- BC Tag 2: Subsonic Outlet ---
+//     else if (f.bcTag == 2) {
+//         // for mach 5 case:
+//         U_ghost = U_in;
+//     }
+//     // --- BC Tag 3: Slip Wall (Upstream of leading edge) ---
+//     else if (f.bcTag == 3) {
+//         double u = U_in.rhou / U_in.rho;
+//         double v = U_in.rhov / U_in.rho;
+//         double vn = u * f.nx + v * f.ny;
+        
+//         double u_g = u - 2.0 * vn * f.nx;
+//         double v_g = v - 2.0 * vn * f.ny;
+        
+//         U_ghost.rho = U_in.rho;
+//         U_ghost.rhou = U_in.rho * u_g;
+//         U_ghost.rhov = U_in.rho * v_g;
+//         U_ghost.rhoE = U_in.rhoE; 
+//     }
+//     // --- BC Tag 4: Flat Plate (No-Slip Wall) ---
+//     else if (f.bcTag == 4) {
+//         // for mach 5 case:
+//         double u_g = - (U_in.rhou / U_in.rho);
+//         double v_g = - (U_in.rhov / U_in.rho);
+
+//         double ek_in = 0.5 * (U_in.rhou * U_in.rhou + U_in.rhov * U_in.rhov) / U_in.rho;
+//         double p_in = (gamma - 1.0) * (U_in.rhoE - ek_in);
+//         double T_in = p_in / (U_in.rho * R_gas);
+
+//         double T_ghost = T_in;
+//         double rho_g = p_in / (R_gas * T_ghost);
+//         double k_in = 0.0, omega_in = 0.0;
+
+//         U_ghost = primitiveToConservative(rho_g, u_g, v_g, p_in, k_in, omega_in);
+//     }
+
+//     return U_ghost;
+// }
 
 //pm case
 

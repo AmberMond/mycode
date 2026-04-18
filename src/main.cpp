@@ -50,53 +50,54 @@ void saveResults(const Mesh& mesh, const std::vector<State>& U, int step) {
     for(const auto& u : U) file << u.rho << "\n";
 }
 // for 2d bump
-// int main() {
-//     Mesh mesh;
-//     // mesh
-//     mesh.load("mesh/bump_1230"); 
+int main() {
+    Mesh mesh;
+    // mesh
+    mesh.load("mesh/bump_1230"); 
 
-//     Solver solver(mesh);
+    Solver solver(mesh);
 
-//     // Ma = 0.5, AoA = 0
-//     // P_static = 101325 Pa, T_static = 300 K
+    // Ma = 0.5, AoA = 0
+    // P_static = 101325 Pa, T_static = 300 K
 
-//     solver.setFlowConditions(0.5, 101325.0, 300.0);
+    solver.setFlowConditions(0.5, 101325.0, 300.0);
     
-//     solver.initialize();
+    solver.initialize();
 
-//     // explicit time stepping
-//     // L and c for calculate CFL number (explicit)
-//     // dt ~ L / c ~ 0.01 / 340 ~ 3e-5
+    // explicit time stepping
+    // L and c for calculate CFL number (explicit)
+    // dt ~ L / c ~ 0.01 / 340 ~ 3e-5
     
-//     // double dt = 1e-5; 
-//     // int maxSteps = 5000;
+    // double dt = 1e-5; 
+    // int maxSteps = 5000;
 
-//     // std::cout << "Starting simulation..." << std::endl;
-//     // for (int i = 0; i <= maxSteps; ++i) {
-//     //     solver.timeStepExplicit(dt);
+    // std::cout << "Starting simulation..." << std::endl;
+    // for (int i = 0; i <= maxSteps; ++i) {
+    //     solver.timeStepExplicit(dt);
       
-//     //     if (i % 100 == 0) {
-//     //         std::cout << "Step " << i << std::endl;
-//     //         saveResults(mesh, solver.getSolution(), i);
-//     //     }
-//     // }
+    //     if (i % 100 == 0) {
+    //         std::cout << "Step " << i << std::endl;
+    //         saveResults(mesh, solver.getSolution(), i);
+    //     }
+    // }
 
-//     std::cout << "JFNK" << std::endl;
-//     solver.solveImplicit(1e-5, 2500);
-//     saveResults(mesh, solver.getSolution(), 9999);
+    std::cout << "JFNK" << std::endl;
+    solver.setNumericalMethod(FluxScheme::LLF, SpatialScheme::FIRST_ORDER);
+    solver.solveImplicit(1e-5, 2500);
+    saveResults(mesh, solver.getSolution(), 9999);
 
-//     std::cout << " Grs " << std::endl;
-//     solver.calculateEntropyError();
+    std::cout << " Grs " << std::endl;
+    solver.calculateEntropyError();
 
-//     std::cout << " Drag " << std::endl;
-//     solver.calculateDrag();
+    std::cout << " Drag " << std::endl;
+    solver.calculateDrag();
 
-//     std::cout << "Done" << std::endl;
+    std::cout << "Done" << std::endl;
 
 
 
-//     return 0;
-//     }
+    return 0;
+    }
 
 
 
@@ -105,7 +106,7 @@ void saveResults(const Mesh& mesh, const std::vector<State>& U, int step) {
 // int main() {
 //     Mesh mesh;
 //     // read mesh
-//     mesh.load("wind_tunnel_4t"); 
+//     mesh.load("mesh/wind_tunnel_4t"); 
 
 //     Solver solver(mesh);
 
@@ -114,19 +115,23 @@ void saveResults(const Mesh& mesh, const std::vector<State>& U, int step) {
 
 //     // 3. explicit time stepping
     
-//     double dt = 5e-4;
-//     int maxSteps = 20000; 
+//     // double dt = 5e-4;
+//     // int maxSteps = 20000; 
 
-//     std::cout << "Starting Explicit Mach 3 Simulation..." << std::endl;
-//     for (int i = 0; i <= maxSteps; ++i) {
-//         solver.timeStepExplicit(dt);
+//     // std::cout << "Starting Explicit Mach 3 Simulation..." << std::endl;
+//     // for (int i = 0; i <= maxSteps; ++i) {
+//     //     solver.timeStepExplicit(dt);
       
         
-//         if (i % 100 == 0) {
-//             std::cout << "Step " << i << " | Physical Time: " << i * dt << std::endl;
-//             saveResults(mesh, solver.getSolution(), i);
-//         }
-//     }
+//     //     if (i % 100 == 0) {
+//     //         std::cout << "Step " << i << " | Physical Time: " << i * dt << std::endl;
+//     //         saveResults(mesh, solver.getSolution(), i);
+//     //     }
+//     // }
+//     std::cout<<"Start JFNK" << std::endl;
+//     solver.setNumericalMethod(FluxScheme::LLF, SpatialScheme::FIRST_ORDER);
+//     solver.solveImplicit(1e-5, 5000);
+//     saveResults(mesh, solver.getSolution(), 9999);
 
 //     std::cout << "Done" << std::endl;
 
@@ -134,30 +139,7 @@ void saveResults(const Mesh& mesh, const std::vector<State>& U, int step) {
 // }
 
 
-// for TGV
 
-// int main() {
-//     Mesh mesh;
-//     mesh.load("tgv2x");
-
-//     Solver solver(mesh);
-//     solver.initializeTGV(); 
-
-//     double dt_phy = 5e-4; 
-//     int maxSteps = 300;
-
-//     std::cout << "Starting Unsteady JFNK TGV Simulation..." << std::endl;
-    
-//     for (int i = 0; i < maxSteps; ++i) {
-       
-//         solver.solveUnsteady(dt_phy, 1);
-//         std::cout << "Step: " << i + 1 << " Done." << std::endl;
-//         saveResults(mesh, solver.getSolution(), i + 1);
-//     }
-    
-//     std::cout << "Done" << std::endl;
-//     return 0;
-// }
 
 // for NASA supersonic test case
 
@@ -183,32 +165,32 @@ void saveResults(const Mesh& mesh, const std::vector<State>& U, int step) {
 // for NASA laminar flat plate
 
 
-int main() {
-    Mesh mesh;
-    // Load your flat plate unstructured mesh
-    mesh.load("mesh/new_laminar_flat_plate"); 
+// int main() {
+//     Mesh mesh;
+//     // Load your flat plate unstructured mesh
+//     mesh.load("mesh/new_laminar_flat_plate"); 
 
-    Solver solver(mesh);
+//     Solver solver(mesh);
 
-    solver.setNumericalMethod(FluxScheme::HLLC, SpatialScheme::SECOND_ORDER_CENTRAL);
-    // Convert Flow conditions to SI if needed: 
-    // Mach 0.1, P_static = 41368.5 Pa, T_static = 388.89 K
-    solver.setFlowConditions(0.1, 41368.5, 388.89);
+//     solver.setNumericalMethod(FluxScheme::HLLC, SpatialScheme::SECOND_ORDER_CENTRAL);
+//     // Convert Flow conditions to SI if needed: 
+//     // Mach 0.1, P_static = 41368.5 Pa, T_static = 388.89 K
+//     solver.setFlowConditions(0.1, 41368.5, 388.89);
     
-    // Add Viscosity initialization for flat plate (Re=200k, L=0.3048m)
-    solver.setKinematicViscosity(200000.0, 0.3048);
+//     // Add Viscosity initialization for flat plate (Re=200k, L=0.3048m)
+//     solver.setKinematicViscosity(200000.0, 0.3048);
     
-    solver.initialize();
+//     solver.initialize();
 
-    std::cout << "Starting simulation JFNK..." << std::endl;
-    // You might need a smaller CFL or local timestep since viscous cells near the wall are tiny
-    solver.solveImplicit(1e-4, 50000); 
-    double L = 0.3048;
-    solver.extractBoundaryLayerProfile(L, "bl_profile.csv");
-    solver.extractSkinFriction("cf_profile.csv");
-    saveResults(mesh, solver.getSolution(), 9999);
-    return 0;
-}
+//     std::cout << "Starting simulation JFNK..." << std::endl;
+//     // You might need a smaller CFL or local timestep since viscous cells near the wall are tiny
+//     solver.solveImplicit(1e-4, 50000); 
+//     double L = 0.3048;
+//     solver.extractBoundaryLayerProfile(L, "bl_profile.csv");
+//     solver.extractSkinFriction("cf_profile.csv");
+//     saveResults(mesh, solver.getSolution(), 9999);
+//     return 0;
+// }
 
 
 // SWBLI mach 5 shock wave:
@@ -237,7 +219,7 @@ int main() {
 
 
 
-// pm
+//pm
 // int main(){
 //     Mesh mesh;
 //     mesh.load("mesh/pm_nasa_v1");
